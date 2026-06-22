@@ -1,0 +1,21 @@
+[tool.poetry]
+name = "ner-roberta"
+version = "0.1.0"
+description = "XLM-RoBERTa NER (MEDDOCAN, 3-class PER/GPE/STREET) — Tensorleap integration"
+authors = ["Tensorleap <support@tensorleap.ai>"]
+package-mode = false
+
+[tool.poetry.dependencies]
+python = ">=3.10,<3.11"
+torch = "^2.2"
+transformers = "^4.40"
+datasets = ">=2.16,<3.0"
+sentencepiece = "^0.2.0"
+numpy = ">=1.24,<2.0"
+onnx = "^1.16"
+onnxruntime = ">=1.18,<1.20"
+seqeval = "^1.2.2"
+
+[build-system]
+requires = ["poetry-core>=1.5.0"]
+build-backend = "poetry.core.masonry.api"

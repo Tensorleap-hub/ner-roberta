@@ -1,0 +1,19 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Poetry venv (in-project)
+.venv/
+
+# Model artifacts (uploaded to Tensorleap separately; not tracked)
+model/
+*.onnx
+*.h5
+
+# Local HF checkpoints produced by training
+checkpoints/
+
+# OS
+.DS_Store
