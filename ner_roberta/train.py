@@ -7,6 +7,7 @@ merges subwords back into words.
 
 import os
 import pickle
+import sys
 
 import numpy as np
 import torch
@@ -80,6 +81,7 @@ def evaluate(model, loader, device) -> dict:
 
 def train(epochs: int = 3, batch_size: int = 32, lr: float = 5e-5,
           out_dir: str = "checkpoints", limit: int = 0) -> str:
+    sys.stdout.reconfigure(line_buffering=True)  # live logs, not buffered
     device = _pick_device()
     print(f"device: {device}")
 
@@ -115,13 +117,13 @@ def train(epochs: int = 3, batch_size: int = 32, lr: float = 5e-5,
         print(f"[epoch {epoch}] train_loss={running / len(train_loader):.4f} "
               f"val_token_acc={metrics['token_acc']:.4f} "
               f"val_entity_f1={metrics.get('entity_f1', float('nan')):.4f}")
+        # Save after EVERY epoch: crash recovery + a usable model from epoch 1.
+        os.makedirs(out_dir, exist_ok=True)
+        model.save_pretrained(out_dir)
+        print(f"  checkpoint saved -> {out_dir} (after epoch {epoch})")
 
     if metrics.get("report"):
         print(metrics["report"])
-
-    os.makedirs(out_dir, exist_ok=True)
-    model.save_pretrained(out_dir)
-    print(f"saved model -> {out_dir}")
     return out_dir
 
 
