@@ -15,7 +15,7 @@ dataset, and (b) a trained ONNX model, which the integration then consumes.
 | Poetry env (Python 3.10) + ML stack + `code-loader` | ✅ done |
 | Data pipeline → processed windows in the data volume | ✅ done |
 | Fine-tuned model → float32-input ONNX (val entity-F1 **0.96**) | ✅ done |
-| `leap_integration.py` + `leap.yaml` (Tensorleap integration) | ⏳ **not yet created** |
+| `leap_integration.py` + `leap.yaml` (Tensorleap integration) | ✅ done (`check_dataset` valid) |
 
 ## Layout
 
@@ -31,7 +31,9 @@ scripts/
   export_onnx.py   # export a trained checkpoint to ONNX (+ verify)
 checkpoints/        # HF checkpoint written by training (gitignored)
 model/              # ner_roberta.onnx (gitignored; uploaded to Tensorleap separately)
-# leap_integration.py / leap.yaml  -> to be added (Tensorleap integration)
+leap_integration.py # Tensorleap integration (decorator style)
+leap.yaml           # Tensorleap config (entryFile, pythonVersion, include)
+requirements.txt    # runtime deps for the platform (numpy, onnxruntime)
 ```
 
 ## Setup
@@ -122,6 +124,28 @@ subword of each word (continuation/special/pad positions masked to `-100`).
 | entity-F1 (micro) | **0.96** |
 | PER / GPE / STREET F1 | 0.98 / 0.96 / 0.92 |
 | token accuracy | 0.998 |
+
+## Tensorleap integration
+
+`leap_integration.py` (decorator style) exposes:
+
+| Interface | Name(s) | Notes |
+|---|---|---|
+| `@tensorleap_preprocess` | — | reads `training.pkl` / `validation.pkl` from the data volume |
+| `@tensorleap_input_encoder` | `input_ids`, `attention_mask` | unbatched `[32]` float32 |
+| `@tensorleap_gt_encoder` | `ner_labels` | one-hot `[32, 7]` |
+| `@tensorleap_load_model` | — | ONNX `InferenceSession`; 1 prediction type `ner_logits` (7 labels) |
+| `@tensorleap_custom_loss` | `token_ce_loss` | masked per-sample softmax cross-entropy |
+| `@tensorleap_custom_metric` | `token_accuracy` | per-sample token accuracy (Upward) |
+| `@tensorleap_metadata` | `meta` | doc id, window index, token/word counts, per-class entity counts, has_entity |
+| `@tensorleap_custom_visualizer` | `ner_predicted`, `ner_ground_truth` | `TextMask` NER highlighting; tokens read from the `SamplePreprocessResponse` (no tokenizer needed at runtime) |
+| `@tensorleap_integration_test` | — | kept thin: decorated calls + the ONNX inference only |
+
+Validate locally with the skill's structured check:
+
+```bash
+poetry run python <skill>/scripts/tl_check.py "$(pwd)"   # expect isValid: true
+```
 
 ## Data / model placement (Tensorleap conventions)
 
