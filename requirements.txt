@@ -1,0 +1,6 @@
+# Runtime deps for the Tensorleap integration (installed with pip, additively on
+# the platform base image which already provides code_loader). Training/data-prep
+# deps (torch, transformers, datasets) are intentionally NOT here — the
+# integration does not import them at runtime.
+numpy==1.26.4
+onnxruntime==1.19.2

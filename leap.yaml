@@ -1,0 +1,13 @@
+entryFile: leap_integration.py
+pythonVersion: py310
+include:
+  - leap.yaml
+  - leap_integration.py
+  - requirements.txt
+  - ner_roberta/__init__.py
+  - ner_roberta/config.py
+exclude:
+  - .git/**
+  - .venv/**
+  - checkpoints/**
+  - model/**
