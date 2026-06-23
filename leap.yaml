@@ -1,13 +1,15 @@
+projectId: 6a3a1e577353982c1fb3c270
+secretId: ""
 entryFile: leap_integration.py
-pythonVersion: py310
 include:
-  - leap.yaml
-  - leap_integration.py
-  - requirements.txt
-  - ner_roberta/__init__.py
-  - ner_roberta/config.py
+    - leap.yaml
+    - leap_integration.py
+    - requirements.txt
+    - ner_roberta/__init__.py
+    - ner_roberta/config.py
 exclude:
-  - .git/**
-  - .venv/**
-  - checkpoints/**
-  - model/**
+    - .git/**
+    - .venv/**
+    - checkpoints/**
+    - model/**
+pythonVersion: py310
