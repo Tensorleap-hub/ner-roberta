@@ -1,6 +1,17 @@
-# Runtime deps for the Tensorleap integration (installed with pip, additively on
-# the platform base image which already provides code_loader). Training/data-prep
-# deps (torch, transformers, datasets) are intentionally NOT here — the
-# integration does not import them at runtime.
+# Deps for the Tensorleap integration (installed with pip, additively on the
+# platform base image, which already provides code_loader).
+#
+# numpy / onnxruntime  -> always used at runtime.
+# transformers / datasets / sentencepiece -> used by preprocess()'s on-demand
+#   data-prep fallback, so the PLATFORM can fetch + build the dataset itself when
+#   the data volume is empty (e.g. pushed without running scripts/prepare_data.py
+#   first). torch is intentionally excluded: data prep needs only the tokenizer +
+#   datasets + numpy, not torch.
+#
+# NOTE: datasets must stay < 3 — bigbio/meddocan uses script-based loading
+# (trust_remote_code), which datasets 3.x removed.
 numpy==1.26.4
 onnxruntime==1.19.2
+transformers==4.57.6
+datasets==2.21.0
+sentencepiece==0.2.1

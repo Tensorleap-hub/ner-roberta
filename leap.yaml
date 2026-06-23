@@ -7,6 +7,8 @@ include:
     - requirements.txt
     - ner_roberta/__init__.py
     - ner_roberta/config.py
+    - ner_roberta/data.py
+    - ner_roberta/tokenization.py
 exclude:
     - .git/**
     - .venv/**
