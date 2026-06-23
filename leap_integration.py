@@ -56,10 +56,35 @@ from ner_roberta.config import (
 _SPLIT_CACHE = {}
 
 
+def _ensure_prepared(path: str) -> None:
+    """If a processed split is missing, fetch + build it into the data volume.
+
+    Lazy local convenience: the heavy prep deps (transformers/datasets) are
+    imported only here, so the integration module stays import-light and the
+    platform — where the dataset is pre-placed in the data volume — never runs
+    this path. If the data is missing AND the prep deps are unavailable (e.g. on
+    the platform), it raises a clear, actionable error instead of failing deep.
+    """
+    if os.path.exists(path):
+        return
+    try:
+        from ner_roberta.data import prepare_dataset
+    except ImportError as e:
+        raise RuntimeError(
+            f"Processed data is missing under {DATASET_DIR} and the prep "
+            f"dependencies (transformers/datasets) are unavailable to build it "
+            f"({e}). Place the prepared dataset in the data volume, or run "
+            f"`python scripts/prepare_data.py` locally."
+        ) from e
+    prepare_dataset(DATASET_DIR)
+
+
 def _load_split(state_key: str) -> dict:
     """Load a processed split pickle ({"sample_ids": [...], "samples": {...}})."""
     if state_key not in _SPLIT_CACHE:
-        with open(os.path.join(DATASET_DIR, f"{state_key}.pkl"), "rb") as f:
+        path = os.path.join(DATASET_DIR, f"{state_key}.pkl")
+        _ensure_prepared(path)
+        with open(path, "rb") as f:
             _SPLIT_CACHE[state_key] = pickle.load(f)
     return _SPLIT_CACHE[state_key]
 

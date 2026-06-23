@@ -14,6 +14,8 @@ This module imports the heavy ML stack and is used only by prepare_data.py /
 train.py — NOT by leap_integration.py.
 """
 
+import os
+import pickle
 from typing import Dict, List, Optional, Tuple
 
 import numpy as np
@@ -23,6 +25,7 @@ from transformers import AutoTokenizer
 from .config import (
     BASE_MODEL,
     CONTENT_SIZE,
+    DATASET_DIR,
     LABEL2ID,
     MEDDOCAN_TYPE_MAP,
     NO_WORD,
@@ -200,3 +203,23 @@ def build_split(split: str, tokenizer=None) -> Dict[str, dict]:
         for win in make_windows(doc["document_id"], split_key, flat, tokenizer):
             samples[win["sample_id"]] = win
     return samples
+
+
+def prepare_dataset(out_dir: str = DATASET_DIR, verbose: bool = True) -> str:
+    """Fetch MEDDOCAN, build windows, and write one pickle per split to out_dir.
+
+    Reusable entry point for both scripts/prepare_data.py and the on-demand
+    fallback in leap_integration.preprocess(). Each pickle is
+    ``{"sample_ids": [...], "samples": {sid: {...}}}``.
+    """
+    os.makedirs(out_dir, exist_ok=True)
+    tokenizer = AutoTokenizer.from_pretrained(BASE_MODEL)
+    for split, key in SPLIT_MAP.items():
+        samples = build_split(split, tokenizer=tokenizer)
+        sample_ids = sorted(samples.keys())
+        path = os.path.join(out_dir, f"{key}.pkl")
+        with open(path, "wb") as f:
+            pickle.dump({"sample_ids": sample_ids, "samples": samples}, f)
+        if verbose:
+            print(f"{key:11s} -> {len(sample_ids):6d} windows -> {path}")
+    return out_dir
