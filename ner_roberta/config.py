@@ -68,3 +68,15 @@ CONTENT_SIZE = WINDOW_SIZE - 2  # 30
 
 # Sentinel for "no word" positions (special tokens / padding) in word_ids.
 NO_WORD = -1
+
+# --- Sample cap ------------------------------------------------------------
+# Upper bound on samples per split. preprocess() exposes
+# min(REQUIRED_SAMPLES, real_length) sample_ids (the effective dataset length).
+# Raise/lower to trade analysis coverage against eval time.
+REQUIRED_SAMPLES = 1000
+
+# --- Display (visualizers) -------------------------------------------------
+# XLM-R SentencePiece word-boundary marker, and special tokens hidden when
+# rendering human-readable text in the NER visualizers.
+SUBWORD_PREFIX = "▁"  # '▁'
+SPECIAL_TOKENS = ("<s>", "</s>", "<pad>")

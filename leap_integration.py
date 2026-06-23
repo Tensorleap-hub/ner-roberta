@@ -43,6 +43,9 @@ from ner_roberta.config import (
     MODEL_PATH,
     NUM_LABELS,
     O_ID,
+    REQUIRED_SAMPLES,
+    SPECIAL_TOKENS,
+    SUBWORD_PREFIX,
     WINDOW_SIZE,
 )
 
@@ -61,17 +64,22 @@ def _load_split(state_key: str) -> dict:
     return _SPLIT_CACHE[state_key]
 
 
+def _capped(sample_ids: List[str]) -> List[str]:
+    """Limit a split to min(REQUIRED_SAMPLES, real length) sample_ids."""
+    return sample_ids[:min(REQUIRED_SAMPLES, len(sample_ids))]
+
+
 @tensorleap_preprocess()
 def preprocess() -> List[PreprocessResponse]:
     train = _load_split("training")
     val = _load_split("validation")
     return [
         PreprocessResponse(
-            sample_ids=train["sample_ids"], data=train["samples"],
+            sample_ids=_capped(train["sample_ids"]), data=train["samples"],
             state=DataStateType.training,
         ),
         PreprocessResponse(
-            sample_ids=val["sample_ids"], data=val["samples"],
+            sample_ids=_capped(val["sample_ids"]), data=val["samples"],
             state=DataStateType.validation,
         ),
     ]
@@ -190,22 +198,52 @@ def _spr_sample(spr: SamplePreprocessResponse) -> dict:
     return spr.preprocess_response.data[sid]
 
 
+def _merge_to_words(tokens, label_ids, word_start, attention_mask):
+    """Merge subword tokens back into human-readable words.
+
+    Subwords are grouped by word boundary (word_start_mask): the SentencePiece
+    prefix is stripped and continuation pieces are concatenated, so
+    ['▁Respons', 'able'] -> 'Responsable'. Each word's label is its first
+    subword's label (standard subword->word NER postprocessing). Special tokens
+    and padding are dropped. Returns (words: List[str], mask: uint8[n_words]).
+    """
+    words, labels = [], []
+    cur_text, cur_label, started = "", 0, False
+    for tok, lab, ws, am in zip(tokens, label_ids, word_start, attention_mask):
+        if am < 1 or tok in SPECIAL_TOKENS:
+            continue
+        piece = tok.replace(SUBWORD_PREFIX, "")
+        if ws == 1 or not started:          # new word (or first content subword)
+            if started and cur_text:
+                words.append(cur_text)
+                labels.append(cur_label)
+            cur_text, cur_label, started = piece, int(lab), True
+        else:                                # continuation subword
+            cur_text += piece
+    if started and cur_text:
+        words.append(cur_text)
+        labels.append(cur_label)
+    return words, np.asarray(labels, dtype=np.uint8)
+
+
 @tensorleap_custom_visualizer("ner_predicted", LeapDataType.TextMask)
 def ner_predicted_viz(prediction: np.ndarray,
                       spr: SamplePreprocessResponse) -> LeapTextMask:
-    tokens = list(_spr_sample(spr)["tokens"])
+    s = _spr_sample(spr)
     if prediction.ndim == 3:        # drop batch dim if present ([B,32,7] -> [32,7])
         prediction = prediction[0]
-    mask = prediction.argmax(axis=-1).astype(np.uint8)  # [32] predicted label id
-    return LeapTextMask(mask=mask, text=tokens, labels=LABELS)
+    pred_ids = prediction.argmax(axis=-1)               # [32] per-subword pred
+    words, mask = _merge_to_words(s["tokens"], pred_ids,
+                                  s["word_start_mask"], s["attention_mask"])
+    return LeapTextMask(mask=mask, text=words, labels=LABELS)
 
 
 @tensorleap_custom_visualizer("ner_ground_truth", LeapDataType.TextMask)
 def ner_ground_truth_viz(spr: SamplePreprocessResponse) -> LeapTextMask:
-    sample = _spr_sample(spr)
-    tokens = list(sample["tokens"])
-    mask = sample["labels"].astype(np.uint8)            # [32] gt label id
-    return LeapTextMask(mask=mask, text=tokens, labels=LABELS)
+    s = _spr_sample(spr)
+    words, mask = _merge_to_words(s["tokens"], s["labels"],
+                                  s["word_start_mask"], s["attention_mask"])
+    return LeapTextMask(mask=mask, text=words, labels=LABELS)
 
 
 # --------------------------------------------------------------------------- #
@@ -231,8 +269,21 @@ def integration_test(sample_id: str, preprocess: PreprocessResponse):
 if __name__ == "__main__":
     subsets = preprocess()
     for subset in subsets:
+        print(f"{subset.state.value}: {len(subset.sample_ids)} samples "
+              f"(cap REQUIRED_SAMPLES={REQUIRED_SAMPLES})")
+
+    # Readability check: print the merged (human-readable) GT visualizer text
+    val = next(s for s in subsets if s.state == DataStateType.validation)
+    sid = next(s for s in val.sample_ids
+               if (val.data[s]["labels"] > 0).any())  # a window with an entity
+    viz = ner_ground_truth_viz(SamplePreprocessResponse(sid, val))
+    print(f"\nGT visualizer for {sid}:")
+    print("  text :", " ".join(viz.text))
+    print("  tags :", " ".join(LABELS[m] for m in viz.mask))
+
+    for subset in subsets:
         if subset.state not in (DataStateType.training, DataStateType.validation):
             continue
-        for sid in subset.sample_ids[:3]:
-            integration_test(sid, subset)
+        for s in subset.sample_ids[:3]:
+            integration_test(s, subset)
         print(f"ran integration_test on 3 {subset.state.value} samples")
